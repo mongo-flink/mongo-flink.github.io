@@ -1,37 +1,75 @@
-## Welcome to GitHub Pages
+## What is Mongo flink?
 
-You can use the [editor on GitHub](https://github.com/mongo-flink/docs/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+MongoFlink is a connector between MongoDB and Apache Flink. It acts as a Flink sink (and an experimental Flink source), and provides transaction mode(which ensures exactly-once semantics) for MongoDB 4.2 above, and non-transaction mode for MongoDB 3.0 above.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+MongoFlink is in its early phase, and any use, feedback or contribution is welcome!
 
-### Markdown
+# Start to use
+## Prerequisite
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+- Flink 1.12 above. MongoFlink is built on top of the new sink API added in FLIP-143 or Flink 1.12.0.
+- MongoDB 3.0 above. The official MongoDB Java driver supports 3.0 above.
+- JDK 1.8 above.
 
-```markdown
-Syntax highlighted code block
+## Build
+MongoFlink is not registered on Maven central yet, so users need to build the artifacts first.
 
-# Header 1
-## Header 2
-### Header 3
+Checkout the project, and use Maven to install the project locally.
 
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
+```
+$ mvn install
 ```
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+Then add the following dependency in your project's pom.xml.
 
-### Jekyll Themes
+```
+<dependency>
+    <groupId>org.mongoflink</groupId>
+    <artifactId>mongo-flink</artifactId>
+    <version>0.1-SNAPSHOT</version>
+</dependency>
+```
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/mongo-flink/docs/settings/pages). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+## Code
 
-### Support or Contact
+Use MongoSink in your Flink application.
 
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+```java
+    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+    // non-transactional sink with a flush strategy of 1000 documents or 10 seconds
+    Properties properties = new Properties();
+    properties.setProperty(MongoOptions.SINK_TRANSACTION_ENABLED, "false");
+    properties.setProperty(MongoOptions.SINK_FLUSH_ON_CHECKPOINT, "false");
+    properties.setProperty(MongoOptions.SINK_FLUSH_SIZE, String.valueOf(1_000L));
+    properties.setProperty(MongoOptions.SINK_FLUSH_INTERVAL, String.valueOf(10_000L));
+
+    env.addSource(...)
+       .sinkTo(new MongoSink<>("mongodb://user:password@127.0.0.1:27017", "mydb", "mycollection",
+                               new StringDocumentSerializer(), properties));
+
+    env.execute();
+```
+
+# Configuration
+
+MongoFlink can be configured using properties.
+
+## MongoSink
+
+| key | description | default value |
+| --- | ----------- | ------------- |
+| sink.transaction.enable | Whether use transactions in MongoSink (requires MongoDB 4.2+). | false |
+| sink.flush.on-checkpoint | Whether flush the buffered documents on checkpoint barriers. | false |
+| sink.flush.size | Max buffered documents before flush. Only valid when `sink.flush.on-checkpoint` is `false`. | 1000 |
+| sink.flush.interval | Flush interval in milliseconds. Only valid when `sink.flush.on-checkpoint` is `false`. | 30000 |
+
+# Contribute to the project
+
+## Report an issue
+Welcome to file an issue if you need help on adopting MongoFlink. Please describe your environment in the issue
+(e.g. what MongoDB/Flink version you're using).
+
+## Contribute code
+Welcome to open pull requests if you want to improve MongoFlink. Please state the purpose (and the design if it's a big
+feature) for better review experience.
